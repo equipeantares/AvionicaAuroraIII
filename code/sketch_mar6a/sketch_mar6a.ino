@@ -1,12 +1,23 @@
 #include <Wire.h>
 #include <Adafruit_BMP280.h>
-
+#include <SPI.h>
+#include <SD.h>
 
 Adafruit_BMP280 bmp; // I2C
 
 //Endereço em hexadecimal do sensor MPU 6050
 const int ENDERECO_SENSOR=0x68;  
 
+File dataFrame;
+
+float altitude;
+float altitudeAnterior;
+float altura;
+float pressao;
+float tempBMP;
+
+float acelX, acelY, acelZ;
+float temperatura
 int16_t girX, girY, girZ;
 float eixoX, eixoY, eixoZ;
 float eixoXCalibre, eixoYCalibre, eixoZCalibre;
@@ -40,7 +51,6 @@ void gyro(void)
   eixoZ = (float)girZ/65.6;
 
 }
-
 
 void setup() {
 
@@ -76,8 +86,6 @@ void setup() {
   while ( !Serial ) delay(100);   // wait for native usb
   Serial.println(F("BMP280 test"));
 
-  float altitude;
-  float altitudeAnterior;
   unsigned status;
   status = bmp.begin();
 
@@ -98,6 +106,49 @@ void setup() {
                   Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
                   Adafruit_BMP280::FILTER_X16,      /* Filtering. */
                   Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
+
+
+    /* Inicializacao Leitor microSD */
+  Serial.println("Inicializando leitor microSD...");
+  if (!SD.begin(4)) {
+    Serial.println("Falha ao inicializar leitor microSD");
+    while (1)
+      delay(10);
+  } else
+    Serial.println("Leitor microSD inicializado com sucesso.");
+
+  /* Só é possível ter um arquivo aberto por vez. Fechar antes de abrir outro */
+  // Parâmetros: <nome do arquivo>.txt, FILE_WRITE (permite ler e escrever no arquivo)
+  // Se arquivo não existir, cria um novo automaticamente
+  dataFrame = SD.open("dataframe.txt", FILE_WRITE);
+
+  // Se arquivo abriu com sucesso, pode-se-lhe escrever:
+  if (dataFrame) {
+    Serial.println("Arquivo dataframe.txt aberto. Escrevendo em dataframe.txt...");
+
+    /* As duas formas de escrever são:
+    dataFrame.println("testing 1, 2, 3.");
+    dataFrame.write("testando 1,2,3."); */
+
+    // read from the file until there's nothing else in it:
+    while (dataFrame.available()) {
+      Serial.write(dataFrame.read());
+    }
+
+
+    // As duas formas de fechar o arquivo são:
+    dataFrame.close();
+    //SD.close("<nome do arquivo>.txt");
+
+    Serial.println("Arquivo test.txt fechado.");
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("Erro ao abrir arquivo test.txt");
+  }
+
+  while (!dataFrame)
+    delay(1);
+
 }
 
 void loop() {
@@ -108,35 +159,61 @@ void loop() {
     eixoY -= eixoYCalibre;
     eixoZ -= eixoZCalibre;
     //Armazena o valor dos sensores nas variaveis correspondentes
-    //acelX = Wire.read()<<8|Wire.read();  //0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)  
-    //acelY = Wire.read()<<8|Wire.read();  //0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)  
-    //acelZ = Wire.read()<<8|Wire.read();  //0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)  
+    acelX = Wire.read()<<8|Wire.read();  //0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)  
+    acelY = Wire.read()<<8|Wire.read();  //0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)  
+    acelZ = Wire.read()<<8|Wire.read();  //0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)  
   
-    //temperatura = Wire.read()<<8|Wire.read();  //0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
+    temperatura = Wire.read()<<8|Wire.read();  //0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
 
     //Printa o valor X do acelerômetro na serial
-    //Serial.print("Acelerômetro X = "); 
-    //Serial.print(acelX);
+    Serial.print("Acelerômetro X = "); 
+    Serial.print(acelX);
+    dataFrame.print(acelX); 
+    dataFrame.print(" ");
+    dataFrame.print("m/s^2");
+    dataFrame.print("\t");
   
     //Printa o valor Y do acelerômetro na serial
-    //Serial.print(" \tY = "); 
-    //Serial.print(acelY);
-    
+    Serial.print(" \tY = "); 
+    Serial.print(acelY);
+    dataFrame.print(acelY); 
+    dataFrame.print(" ");
+    dataFrame.print("m/s^2");
+    dataFrame.print("\t");    
     //Printa o valor Z do acelerômetro na serial
-    //Serial.print(" \tZ = "); 
-    //Serial.println(acelZ);
-
+    Serial.print(" \tZ = "); 
+    Serial.println(acelZ);
+    dataFrame.print(acelZ); 
+    dataFrame.print(" ");
+    dataFrame.print("m/s^2");
+    dataFrame.print("\t");
+  
     //Printa o valor X do giroscópio na serial
     Serial.print("Giroscópio X = "); 
     Serial.print(eixoX);
-    
+    dataFrame.print(eixoX); 
+    dataFrame.print(" ");
+    dataFrame.print("rad/s");
+    dataFrame.print("\t");
+  
+
   //  //Printa o valor Y do giroscópio na serial
     Serial.print(" \tY = "); 
     Serial.print(eixoY);
+    dataFrame.print(eixoY); 
+    dataFrame.print(" ");
+    dataFrame.print("rad/s");
+    dataFrame.print("\t");
+    
   //   
   //  //Printa o valor Z do giroscópio na serial
     Serial.print(" \tZ = "); 
-    Serial.println(eixoZ); 
+    Serial.println(eixoZ);
+    dataFrame.print(eixoY); 
+    dataFrame.print(" ");
+    dataFrame.print("rad/s");
+    dataFrame.print("\t");
+ 
     
   //  //Printa o valor da temperatura na serial, calculando em graus celsius
   //  Serial.print("Temperatura = "); 
@@ -144,11 +221,38 @@ void loop() {
     delay(50);
 
     //BMP
-    altidute = bmp.readAltitude(1013.25);
+    altitude = bmp.readAltitude(1013.25);
 
     Serial.print(F("Altitude aproximada = "));
     Serial.print(altitude); /* Adjusted to local forecast! */
     Serial.println(" m");
+    dataFrame.print(altitude); 
+    dataFrame.print(" ");
+    dataFrame.print("m");
+    dataFrame.print("\t");
+    // Altura
+    altura = altitude - calibraAltitude;
+    dataFrame.print(altura); 
+    dataFrame.print(" ");
+    dataFrame.print("m");
+    dataFrame.print("\t");
+    // Pressao atmosferica
+    pressao = bmp.readPressure();
+    dataFrame.print(pressao); 
+    dataFrame.print(" ");
+    dataFrame.print("Pa");
+    dataFrame.print("\t");    
+
+    // Temperatura BMP
+    tempBMP = bmp.readTemperature();
+    dataFrame.print(tempBMP); 
+    dataFrame.print(" ");
+    dataFrame.print("oC");
+    dataFrame.print("\n");
+
+    delay(100);
+
+
 
     if (altitude < altitudeAnterior) {
       pinmode(3, HIGH);
