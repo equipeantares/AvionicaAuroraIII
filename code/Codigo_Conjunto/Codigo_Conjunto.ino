@@ -1,22 +1,45 @@
 /*
 Implementacao da rotina de execucao Avionica Aurora III
 
-Pendencias:
-Identificar inicio do acionamento para iniciar leituras
-Identificar queda no solo para {
-  cessar leituras
-  fechar arquivo.txt (a ideia eh abrir abrir ao iniciar e fechar somente após identif. queda)
-} 
-...
+Conexoes de fiacao {
+  BMP 280 {
+    VCC - 3V3;
+    GND - GND;
+    SCL - A5;
+    SDA - A4;
+  }
 
-Autores:
-Gabriel Rugeri
-Henrique mago dos Bzoide
+  MPU 6050 {
+    VCC - 3V3 ou 5V (se alimentacao USB);
+    GND - GND;
+    SCL - A5;
+    SDA - A4;
+  }
+
+  Cartao microSD {
+    VCC - 5V;
+    CS - ~10;
+    MOSI - ~11;
+    CLK ou SCK - 13;
+    MISO - 12;
+    GND - GND;
+  }
+}
+
+Pendencias {
+  Identificar inicio do acionamento para iniciar leituras;
+  Identificar queda no solo para cessar leituras;
+  ...
+}
+
+Autores {
+  Gabriel Rugeri;
+  Henrique mago dos Bzoide;
+}
 
 Antares, 2024
 
-Ultima modificacao: 25 03 2024, Rugeri
-
+Ultima modificacao: 04 04 2024, Rugeri
 */
 
 #include <Adafruit_MPU6050.h> // Lib ja inclui Wire.h
@@ -54,10 +77,10 @@ float calibraAltitude = 0;
 float calibraPressao = 0;
 float calibraTempBMP = 0;
 float calibraTempMPU = 0;
-float calibraAcel[3] = [0, 0, 0];
-float calibraGyro[3] = [0, 0, 0];
+float calibraAcel[3] = {0, 0, 0};
+float calibraGyro[3] = {0, 0, 0};
 
-void imprime(const char *medida, const char *dado, const char *unidade, char end) {
+void imprime(const char *medida, float dado, const char *unidade, char end) {
 
   // Imprimir no monitor serial
   Serial.print(medida);
@@ -73,8 +96,8 @@ void imprime(const char *medida, const char *dado, const char *unidade, char end
   dataFrame.print(end);
   
   // Verificar se houve algum erro na escrita do arquivo
-  if (dataFrame.fail())
-    Serial.println("Erro ao escrever no arquivo!");
+  // if (dataFrame.fail())
+  //   Serial.println("Erro ao escrever no arquivo!");
 }
 
 void setup() {
@@ -85,7 +108,8 @@ void setup() {
     /* Inicializa monitor serial */
   int baud = 9600;
   Serial.begin(baud);
-  Serial.println("Iniciando serial: baud " + String(baud));
+  Serial.print("Iniciando serial: baud ");
+  Serial.println(baud);
 
   while (!Serial)
     delay(100);
@@ -164,100 +188,79 @@ void setup() {
       delay(10);
   } else
     Serial.println("Leitor microSD inicializado com sucesso.");
+}
 
-  /* Só é possível ter um arquivo aberto por vez. Fechar antes de abrir outro */
-  // Parâmetros: <nome do arquivo>.txt, FILE_WRITE (permite ler e escrever no arquivo)
-  // Se arquivo não existir, cria um novo automaticamente
+
+void loop() {
+
   dataFrame = SD.open("dataframe.txt", FILE_WRITE);
 
   // Se arquivo abriu com sucesso, pode-se-lhe escrever:
   if (dataFrame) {
     Serial.println("Arquivo dataframe.txt aberto. Escrevendo em dataframe.txt...");
 
-    /* As duas formas de escrever são:
-    dataFrame.println("testing 1, 2, 3.");
-    dataFrame.write("testando 1,2,3."); */
+    // Contador de tempo
+    tempoAtual = millis() - tempoInicial;
+    imprime("Tempo", tempoAtual, "ms", '\t');
 
-    // read from the file until there's nothing else in it:
-    while (dataFrame.available()) {
-      Serial.write(dataFrame.read());
-    }
+      /* Leitura do BMP */
 
+    // Altitude
+    altitude = bmp.readAltitude(1013.25); // Pressao padrao ao nivel de mar
+    imprime("Altitude", altitude, "m", '\t');
 
-    // As duas formas de fechar o arquivo são:
+    // Altura
+    altura = altitude - calibraAltitude;
+    imprime("Altura", altura, "m", '\t');
+
+    // Pressao atmosferica
+    pressao = bmp.readPressure();
+    imprime("Pressao", pressao, "Pa", '\t');
+
+    // Temperatura BMP
+    tempBMP = bmp.readTemperature();
+    imprime("Temperatura (BMP)", tempBMP, "oC", '\t');
+
+    delay(100);
+
+      /* Leitura do MPU: aceleracao, rotacao e temperatura */
+    mpu.getEvent(&a, &g, &temp);
+
+    // Temperatura
+    tempMPU = temp.temperature;
+    imprime("Temperatura (MPU)", tempMPU, "oC", '\t');
+
+    // Aceleracao (x)
+    aceleracao[0] = a.acceleration.x - calibraAcel[0];
+    imprime("Aceleracao (x)", aceleracao[0], "m/s^2", '\t');
+
+    // Aceleracao (y)
+    aceleracao[1] = a.acceleration.y - calibraAcel[1];
+    imprime("Aceleracao (y)", aceleracao[1], "m/s^2", '\t');
+
+    // Aceleracao (z)
+    aceleracao[2] = a.acceleration.z - calibraAcel[2];
+    imprime("Aceleracao (z)", aceleracao[2], "m/s^2", '\t');
+
+    // Gyro (x)
+    gyro[0] = g.gyro.x - calibraAcel[0];
+    imprime("Gyro (x)", gyro[0], "rad/s", '\t');
+
+    // Gyro (y)
+    gyro[1] = g.gyro.y - calibraAcel[1];
+    imprime("Gyro (y)", gyro[1], "rad/s", '\t');
+
+    // Gyro (z)
+    gyro[2] = g.gyro.z - calibraAcel[2];
+    imprime("Gyro (z)", gyro[2], "rad/s", '\n'); //Considerar usar \r\n
+
+    // Fecha arquivo dataframe.txt
     dataFrame.close();
-    //SD.close("<nome do arquivo>.txt");
+    Serial.println("Arquivo dataframe.txt fechado.");
+    Serial.println();
 
-    Serial.println("Arquivo test.txt fechado.");
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("Erro ao abrir arquivo test.txt");
-  }
-
-  while (!dataFrame)
-    delay(1);
-
-}
-
-
-void loop() {
-
-  // Contador de tempo
-  tempoAtual = millis() - tempoInicial;
-  imprime("Tempo", String(tempoAtual), "ms", '\t');
-
-    /* Leitura do BMP */
-
-  // Altitude
-  altitude = bmp.readAltitude(1013.25); // Pressao padrao ao nivel de mar
-  imprime("Altitude", String(altitude), "m", '\t');
-
-  // Altura
-  altura = altitude - calibraAltitude;
-  imprime("Altura", String(altura), "m", '\t');
-
-  // Pressao atmosferica
-  pressao = bmp.readPressure();
-  imprime("Pressao", String(pressao), "Pa", '\t');
-
-  // Temperatura BMP
-  tempBMP = bmp.readTemperature();
-  imprime("Temperatura (BMP)", String(tempBMP), "oC", '\t');
-
-  delay(100);
-
-    /* Leitura do MPU: aceleracao, rotacao e temperatura */
-  mpu.getEvent(&a, &g, &temp);
-
-  // Temperatura
-  tempMPU = temp.temperature;
-  imprime("Temperatura (MPU)", String(tempMPU), "oC", '\t');
-
-  // Aceleracao (x)
-  aceleracao[0] = a.acceleration.x - calibraAcel[0];
-  imprime("Aceleracao (x)", String(aceleracao[0]), "m/s^2", '\t');
-
-  // Aceleracao (y)
-  aceleracao[1] = a.acceleration.y - calibraAcel[1];
-  imprime("Aceleracao (y)", String(aceleracao[1]), "m/s^2", '\t');
-
-  // Aceleracao (z)
-  aceleracao[2] = a.acceleration.z - calibraAcel[2];
-  imprime("Aceleracao (z)", String(aceleracao[2]), "m/s^2", '\t');
-
-  // Gyro (x)
-  gyro[0] = g.gyro.x - calibraAcel[0];
-  imprime("Gyro (x)", String(gyro[0]), "rad/s", '\t');
-
-  // Gyro (y)
-  gyro[1] = g.gyro.y - calibraAcel[1];
-  imprime("Gyro (y)", String(gyro[1]), "rad/s", '\t');
-
-  // Gyro (z)
-  gyro[2] = g.gyro.z - calibraAcel[2];
-  imprime("Gyro (z)", String(gyro[2]), "rad/s", '\n'); //Considerar usar \r\n
-
-  Serial.println();
+  } else
+    Serial.println("Erro ao abrir arquivo dataframe.txt");
   
   delay(100);
 }
