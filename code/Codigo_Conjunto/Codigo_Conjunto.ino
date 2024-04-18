@@ -27,6 +27,7 @@ Conexoes de fiacao {
 }
 
 Pendencias {
+  Sleep mode
   Identificar inicio do acionamento para iniciar leituras;
   Identificar queda no solo para cessar leituras;
   ...
@@ -39,13 +40,13 @@ Autores {
 
 Antares, 2024
 
-Ultima modificacao: 04 04 2024, Rugeri
+Ultima modificacao: 18 04 2024, Rugeri
 */
 
+#include <SD.h> // Lib ja inclui Arduino.h
 #include <Adafruit_MPU6050.h> // Lib ja inclui Wire.h
-#include <Antares_BMP280.h> // Lib ja inclui Adafruit_Sensor.h
+#include <Antares_BMP280.h>
 #include <SPI.h>
-#include <SD.h>
 
 // Objeto arquivo.txt
 File dataFrame;
@@ -74,16 +75,13 @@ float gyro[3];
 
 // Auxiliares de calibracao
 float calibraAltitude = 0;
-float calibraPressao = 0;
-float calibraTempBMP = 0;
-float calibraTempMPU = 0;
 float calibraAcel[3] = {0, 0, 0};
 float calibraGyro[3] = {0, 0, 0};
 
-void imprime(const char *medida, float dado, const char *unidade, char end) {
+void imprime(const char *grandeza, float dado, const char *unidade, char end) {
 
   // Imprimir no monitor serial
-  Serial.print(medida);
+  Serial.print(grandeza);
   Serial.print(" = ");
   Serial.print(dado);
   Serial.print(" ");
@@ -94,23 +92,16 @@ void imprime(const char *medida, float dado, const char *unidade, char end) {
   dataFrame.print(" ");
   dataFrame.print(unidade);
   dataFrame.print(end);
-  
-  // Verificar se houve algum erro na escrita do arquivo
-  // if (dataFrame.fail())
-  //   Serial.println("Erro ao escrever no arquivo!");
 }
 
 void setup() {
 
-  // Armazena o tempo em que o arduino primeiro registra
   tempoInicial = millis();
 
-    /* Inicializa monitor serial */
   int baud = 9600;
   Serial.begin(baud);
   Serial.print("Iniciando serial: baud ");
   Serial.println(baud);
-
   while (!Serial)
     delay(100);
 
@@ -125,21 +116,17 @@ void setup() {
 
   for (int i = 0; i < 2000; i++) {
     calibraAltitude += bmp.readAltitude(1013.25);
-    //calibraPressao += bmp.readPressure();
-    //calibraTempBMP += bmp.readTemperature();
   }
 
   calibraAltitude /= 2000;
-  //calibraPressao /= 2000;
-  //calibraTempBMP /= 2000;
 
 
   /* Configuracoes padrao do datasheet */
-  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
-                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
-                  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
-                  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
-                  Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     
+                  Adafruit_BMP280::SAMPLING_X2,     
+                  Adafruit_BMP280::SAMPLING_X16,    
+                  Adafruit_BMP280::FILTER_X16,      
+                  Adafruit_BMP280::STANDBY_MS_500); 
 
 
     /* Inicializacao MPU6050 */
@@ -152,9 +139,9 @@ void setup() {
     Serial.println("MPU6050 inicializado com sucesso!");
   
   /* Configuracoes de parametros MPU6050 */
-  mpu.setAccelerometerRange(MPU6050_RANGE_8_G); // Range de acelerometro == 8g
-  mpu.setGyroRange(MPU6050_RANGE_500_DEG); // Range de giroscopio == 500 graus/s
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ); // Range de filtro == 21 Hz
+  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 
   for (int i = 0; i < 2000; i++) {
     mpu.getEvent(&a, &g, &temp);
@@ -166,8 +153,6 @@ void setup() {
     calibraGyro[0] += g.gyro.x;
     calibraGyro[1] += g.gyro.y;
     calibraGyro[2] += g.gyro.z;
-
-    //calibraTempMPU += temp.temperature;
   }
 
   calibraAcel[0] /= 2000;
@@ -177,8 +162,6 @@ void setup() {
   calibraGyro[0] /= 2000;
   calibraGyro[1] /= 2000;
   calibraGyro[2] /= 2000;
-
-  //calibraTempMPU /= 2000;
 
     /* Inicializacao Leitor microSD */
   Serial.println("Inicializando leitor microSD...");
@@ -195,7 +178,6 @@ void loop() {
 
   dataFrame = SD.open("dataframe.txt", FILE_WRITE);
 
-  // Se arquivo abriu com sucesso, pode-se-lhe escrever:
   if (dataFrame) {
     Serial.println("Arquivo dataframe.txt aberto. Escrevendo em dataframe.txt...");
 
