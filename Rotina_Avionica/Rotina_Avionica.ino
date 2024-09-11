@@ -48,22 +48,29 @@ Ultima modificacao: 01 05 2024, Rugeri
 #include <Adafruit_BMP280.h>
 #include <SPI.h>
 
-//Enderecos internos MPU6050 (extraidos da lib)
+// Endereços internos MPU6050 (extraídos da lib)
 #define ADDR_BMP 0x76
 #define ADDR_MPU 0x68
-#define MPU6050_CONFIG 0x1A      ///< General configuration register
-#define MPU6050_GYRO_CONFIG 0x1B ///< Gyro specfic configuration register
-#define MPU6050_ACCEL_CONFIG 0x1C ///< Accelerometer specific configration register
-#define MPU6050_TEMP_H 0x41     ///< Temperature data high byte register
-#define MPU6050_TEMP_L 0x42     ///< Temperature data low byte register
-#define MPU6050_ACCEL_OUT 0x3B  ///< base address for sensor data reads
-#define MPU6050_PWR_MGMT_1 0x6B        ///< Primary power/sleep control register
-#define MPU6050_SELF_TEST_A 0x10 ///< Self test factory calibrated values register
-#define ACCEL_SCALE 4096 // Fator de escala para MPU6050_RANGE_8_G
-#define GYRO_SCALE 65.5 // Fator de escala para MPU6050_RANGE_500_DEG
+#define MPU6050_CONFIG 0x1A
+#define MPU6050_GYRO_CONFIG 0x1B
+#define MPU6050_ACCEL_CONFIG 0x1C
+#define MPU6050_TEMP_H 0x41
+#define MPU6050_TEMP_L 0x42
+#define MPU6050_ACCEL_OUT 0x3B
+#define MPU6050_PWR_MGMT_1 0x6B
+#define MPU6050_SELF_TEST_A 0x10
+#define ACCEL_SCALE 4096
+#define GYRO_SCALE 65.5
 
-#define SD_CS_PIN 5 // Pin onde se conecta pino CS do leitor SD
+// Pinagens atualizadas para o microSD
+#define SD_CS_PIN 5   // D5 -> CS
+#define SD_MOSI_PIN 23 // D23 -> MOSI
+#define SD_CLK_PIN 19  // D19 -> CLK
+#define SD_MISO_PIN 18 // D18 -> MISO
 #define BAUD 9600
+
+// SPI object
+SPIClass spiSD(VSPI);  // VSPI is the default SPI bus on ESP32
 
 // Objeto arquivo.txtPCB_AVIONICA_PROTOTIPO
 File dataFrame;
@@ -71,7 +78,7 @@ File dataFrame;
 // Objeto BMP
 Adafruit_BMP280 bmp;
 
-//Contador de tempo
+// Contador de tempo
 unsigned long tempoInicial;
 unsigned long tempoAtual;
 
@@ -84,38 +91,31 @@ float tempMPU;
 float aceleracao[3];
 float gyro[3];
 
-// Auxiliares de calibracao
+// Auxiliares de calibração
 float calibraAltura = 0;
 float calibraAcel[3] = {0, 0, 0};
 float calibraGyro[3] = {0, 0, 0};
 
-
 void imprime(const char *grandeza, float dado, const char *unidade, char end) {
-
-
-  // Imprimir no monitor serial
   Serial.print(grandeza);
   Serial.print(" = ");
   Serial.print(dado);
   Serial.print(" ");
   Serial.println(unidade);
 
-  // Escrever no arquivo
-  dataFrame.print(dado); 
+  dataFrame.print(dado);
   dataFrame.print(" ");
   dataFrame.print(unidade);
   dataFrame.print(end);
 }
 
-
 void leituraMPU() {
-  
   Wire.beginTransmission(ADDR_MPU);
   Wire.write(MPU6050_CONFIG);
   Wire.write(0x05);
   Wire.endTransmission();
 
-  // Leitura giroscopio
+  // Leitura giroscópio
   Wire.beginTransmission(ADDR_MPU);
   Wire.write(MPU6050_GYRO_CONFIG);
   Wire.write(0x8);
@@ -126,16 +126,16 @@ void leituraMPU() {
   Wire.endTransmission();
 
   Wire.requestFrom(ADDR_MPU, 6, true);
-  
-  gyro[0] = Wire.read() << 8 | Wire.read();  //0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)     
-  gyro[1] = Wire.read() << 8 | Wire.read();  //0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-  gyro[2] = Wire.read() << 8 | Wire.read();  //0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+
+  gyro[0] = Wire.read() << 8 | Wire.read();
+  gyro[1] = Wire.read() << 8 | Wire.read();
+  gyro[2] = Wire.read() << 8 | Wire.read();
 
   gyro[0] /= GYRO_SCALE;
   gyro[1] /= GYRO_SCALE;
   gyro[2] /= GYRO_SCALE;
 
-  // Leitura aceleracao e temperatura
+  // Leitura aceleração e temperatura
   Wire.beginTransmission(ADDR_MPU);
   Wire.write(MPU6050_ACCEL_CONFIG);
   Wire.write(MPU6050_SELF_TEST_A);
@@ -147,18 +147,17 @@ void leituraMPU() {
 
   Wire.requestFrom(ADDR_MPU, 6, true);
 
-  aceleracao[0] = Wire.read() << 8 | Wire.read();  //0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)  
-  aceleracao[1] = Wire.read() << 8 | Wire.read();  //0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)  
-  aceleracao[2] = Wire.read() << 8 | Wire.read();  //0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L) 
+  aceleracao[0] = Wire.read() << 8 | Wire.read();
+  aceleracao[1] = Wire.read() << 8 | Wire.read();
+  aceleracao[2] = Wire.read() << 8 | Wire.read();
 
   aceleracao[0] /= ACCEL_SCALE;
   aceleracao[1] /= ACCEL_SCALE;
-  aceleracao[2] /= ACCEL_SCALE; 
+  aceleracao[2] /= ACCEL_SCALE;
 
-  tempMPU = Wire.read() << 8 | Wire.read();  //0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
+  tempMPU = Wire.read() << 8 | Wire.read();
   tempMPU = tempMPU / 340.00 + 36.53;
 }
-
 
 void calibraMPU() {
   Serial.println("Calibrando MPU6050...");
@@ -183,16 +182,15 @@ void calibraMPU() {
   calibraGyro[1] /= 2000;
   calibraGyro[2] /= 2000;
 
-  Serial.println("MPU6050 calibrado. Calibracao:");
-  imprime("Aceleracao X", calibraAcel[0], "m/s^2", '\n');
-  imprime("Aceleracao Y", calibraAcel[1], "m/s^2", '\n');
-  imprime("Aceleracao Z", calibraAcel[2], "m/s^2", '\n');
+  Serial.println("MPU6050 calibrado. Calibração:");
+  imprime("Aceleração X", calibraAcel[0], "m/s^2", '\n');
+  imprime("Aceleração Y", calibraAcel[1], "m/s^2", '\n');
+  imprime("Aceleração Z", calibraAcel[2], "m/s^2", '\n');
   imprime("Gyro X", calibraAcel[0], "rad/s", '\n');
   imprime("Gyro Y", calibraAcel[1], "rad/s", '\n');
   imprime("Gyro Z", calibraAcel[2], "rad/s", '\n');
   Serial.println();
 }
-
 
 void inicializaMPU() {
   Serial.println("Inicializando MPU6050...");
@@ -203,7 +201,7 @@ void inicializaMPU() {
   Wire.setClock(400000);
   Wire.begin();
   delay(250);
-  
+
   Wire.beginTransmission(ADDR_MPU);
   Wire.write(MPU6050_PWR_MGMT_1);
   Wire.write(0x00);
@@ -213,7 +211,6 @@ void inicializaMPU() {
   calibraMPU();
 }
 
-
 void calibraBMP() {
   Serial.println("Calibrando BMP280...");
   Serial.println();
@@ -221,11 +218,10 @@ void calibraBMP() {
     calibraAltura += bmp.readAltitude(1013.25);
   }
   calibraAltura /= 2000;
-  Serial.println("BMP280 calibrado. Calibracao:");
+  Serial.println("BMP280 calibrado. Calibração:");
   imprime("Altitude", calibraAltura, "m", '\n');
   Serial.println();
 }
-
 
 void inicializaBMP() {
   Serial.println("Inicializando BMP280...");
@@ -239,21 +235,25 @@ void inicializaBMP() {
     Serial.println("Sensor BMP280 inicializado com sucesso!");
   Serial.println();
 
-    // Configuracoes padrao do datasheet
-  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     
-                  Adafruit_BMP280::SAMPLING_X2,     
-                  Adafruit_BMP280::SAMPLING_X16,    
-                  Adafruit_BMP280::FILTER_X16,      
-                  Adafruit_BMP280::STANDBY_MS_500); 
+  // Configurações padrão do datasheet
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,
+                  Adafruit_BMP280::SAMPLING_X2,
+                  Adafruit_BMP280::SAMPLING_X16,
+                  Adafruit_BMP280::FILTER_X16,
+                  Adafruit_BMP280::STANDBY_MS_500);
 
   calibraBMP();
 }
 
-
 void inicializaSD() {
   Serial.println("Inicializando leitor microSD...");
   Serial.println();
-  if (!SD.begin(SD_CS_PIN)) {
+
+  // Configurando os pinos SPI manualmente
+  spiSD.begin(SD_CLK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
+
+  // Inicializa o SD card usando o SPI personalizado
+  if (!SD.begin(SD_CS_PIN, spiSD)) {
     Serial.println("Falha ao inicializar leitor microSD");
     while (1)
       delay(10);
@@ -261,7 +261,6 @@ void inicializaSD() {
     Serial.println("Leitor microSD inicializado com sucesso.");
   Serial.println();
 }
-
 
 void inicializaSerialMonitor() {
   Serial.begin(BAUD);
@@ -271,29 +270,21 @@ void inicializaSerialMonitor() {
   Serial.println();
 }
 
-
 void setup() {
-  //pinMode(27, INPUT_PULLUP);
-
-  // Inicializacao dos componentes
+  // Inicialização dos componentes
   inicializaSerialMonitor();
   inicializaBMP();
   inicializaMPU();
   inicializaSD();
 
   tempoInicial = millis();
-
-  // esp_sleep_enable_ext0_wakeup(GPIO_NUM_27, 1);
-  // Serial.println("Entrando modo Sleep");
-  // esp_deep_sleep_start();
 }
-
 
 void loop() {
 
   dataFrame = SD.open("data.txt", FILE_WRITE);
 
-   if (dataFrame) {
+  if (dataFrame) {
     Serial.println("Arquivo data.txt aberto. Escrevendo em data.txt...");
     Serial.println();
 
@@ -301,43 +292,41 @@ void loop() {
     tempoAtual = millis() - tempoInicial;
     imprime("Tempo", tempoAtual, "ms", '\t');
 
-      /* Leitura do BMP */
-
-    // Altitude
-    altitude = bmp.readAltitude(1013.25); // Pressao padrao ao nivel de mar
+    /* Leitura do BMP */
+    altitude = bmp.readAltitude(1013.25);  // Pressão padrão ao nível do mar
     imprime("Altitude", altitude, "m", '\t');
 
     // Altura
     altura = altitude - calibraAltura;
     imprime("Altura", altura, "m", '\t');
 
-    // Pressao atmosferica
+    // Pressão atmosférica
     pressao = bmp.readPressure();
-    imprime("Pressao", pressao, "Pa", '\t');
+    imprime("Pressão", pressao, "Pa", '\t');
 
     // Temperatura BMP
     tempBMP = bmp.readTemperature();
-    imprime("Temperatura (BMP)", tempBMP, "oC", '\t');
+    imprime("Temperatura (BMP)", tempBMP, "°C", '\t');
 
     delay(100);
 
-      /* Leitura do MPU: aceleracao, rotacao e temperatura */
+    /* Leitura do MPU: aceleração, rotação e temperatura */
     leituraMPU();
 
     // Temperatura
-    imprime("Temperatura (MPU)", tempMPU, "oC", '\t');
+    imprime("Temperatura (MPU)", tempMPU, "°C", '\t');
 
-    // Aceleracao (x)
+    // Aceleração (x)
     aceleracao[0] -= calibraAcel[0];
-    imprime("Aceleracao (x)", aceleracao[0], "m/s^2", '\t');
+    imprime("Aceleração (x)", aceleracao[0], "m/s^2", '\t');
 
-    // Aceleracao (y)
+    // Aceleração (y)
     aceleracao[1] -= calibraAcel[1];
-    imprime("Aceleracao (y)", aceleracao[1], "m/s^2", '\t');
+    imprime("Aceleração (y)", aceleracao[1], "m/s^2", '\t');
 
-    // Aceleracao (z)
+    // Aceleração (z)
     aceleracao[2] -= calibraAcel[2];
-    imprime("Aceleracao (z)", aceleracao[2], "m/s^2", '\t');
+    imprime("Aceleração (z)", aceleracao[2], "m/s^2", '\t');
 
     // Gyro (x)
     gyro[0] -= calibraAcel[0];
@@ -349,15 +338,16 @@ void loop() {
 
     // Gyro (z)
     gyro[2] -= calibraAcel[2];
-    imprime("Gyro (z)", gyro[2], "rad/s", '\n'); //Considerar usar \r\n
+    imprime("Gyro (z)", gyro[2], "rad/s", '\n');  // Considerar usar \r\n
 
     // Fecha arquivo dataframe.txt
     dataFrame.close();
     Serial.println("Arquivo data.txt fechado.");
     Serial.println();
 
-  } else
-    Serial.println("Erro ao abrir arquivo data.txt");  // } else
-  
+  } else {
+    Serial.println("Erro ao abrir arquivo data.txt");
+  }
+
   delay(100);
 }
