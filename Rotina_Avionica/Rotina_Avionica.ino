@@ -38,7 +38,7 @@ Autores {
 
 Antares, 2024
 
-Ultima modificacao: 23 05 2024, Rugeri
+Ultima modificacao: 27 09 2024, Henrique
 */
 
 #include <Wire.h>
@@ -59,7 +59,7 @@ Ultima modificacao: 23 05 2024, Rugeri
 #define ACCEL_SCALE 4096 // Fator de escala para MPU6050_RANGE_8_G
 #define GYRO_SCALE 65.5 // Fator de escala para MPU6050_RANGE_500_DEG
 
-#define SD_CS_PIN 10 // Pin onde se conecta pino CS do leitor SD
+#define SD_CS_PIN 5 // Pin onde se conecta pino CS do leitor SD
 
 // Objeto arquivo.txt+
 File dataFrame;
@@ -73,12 +73,14 @@ unsigned long tempoAtual;
 
 // Armazena dado da leitura atual
 float altitude;
+float altitude_anterior = 0;
 float height;
 float pressure;
 float tempBMP;
 float tempMPU;
 float acceleration[3];
 float gyro[3];
+bool led_aceso = false;
 
 // Auxiliares de calibracao
 float calibrationHeight = 0;
@@ -86,12 +88,13 @@ float calibrationAccel[3] = {0, 0, 0};
 float calibrationGyro[3] = {0, 0, 0};
 
 
-void writes_on_SD(const char *grandeza, float dado, const char *unidade, char end) {
+void writes_on_SD(const char *grandeza, float dado, const char *unidade, char fim) {
   // Escrever no arquivo
+  dataFrame.print(grandeza);
   dataFrame.print(dado); 
   dataFrame.print(" ");
   dataFrame.print(unidade);
-  dataFrame.print(end);
+  dataFrame.print(fim);
 }
 
 
@@ -182,8 +185,8 @@ void calibrates_MPU() {
 void starts_up_MPU() {
   Serial.println("Inicializando MPU6050...");
 
-  pinMode(13, OUTPUT);
-  digitalWrite(13, HIGH);
+  pinMode(21, OUTPUT);
+  digitalWrite(21, HIGH);
 
   Wire.setClock(400000);
   Wire.begin();
@@ -247,6 +250,8 @@ void starts_up_serial(int baud) {
 
 
 void setup() {
+  pinMode(26, OUTPUT);
+  
   tempoInicial = millis();
 
   // Inicializacao dos componentes
@@ -259,7 +264,7 @@ void setup() {
 
 void loop() {
 
-  dataFrame = SD.open("testo.txt", FILE_WRITE);
+  dataFrame = SD.open("dados.txt", FILE_WRITE);
 
   if (dataFrame) {
     Serial.println("Arquivo dataframe.txt aberto. Escrevendo em dataframe.txt...");
@@ -322,6 +327,16 @@ void loop() {
     dataFrame.close();
   } else
     Serial.println("Erro ao abrir arquivo dataframe.txt");
+  
+  if(led_aceso) {
+    if(altitude < altitude_anterior) {
+      digitalWrite(26, HIGH);
+      led_aceso = true;
+    }
+    else {
+      altitude_anterior = altitude;
+    }
+  }
   
   delay(100);
 }
