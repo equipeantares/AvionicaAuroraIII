@@ -250,7 +250,7 @@ void starts_up_serial(int baud) {
 
 
 void setup() {
-  pinMode(26, OUTPUT);
+  pinMode(25, OUTPUT);
   
   tempoInicial = millis();
 
@@ -330,7 +330,7 @@ void loop() {
   
   if(!led_aceso) {
     if(altitude < altitude_anterior) {
-      digitalWrite(26, HIGH);
+      digitalWrite(25, HIGH);
       led_aceso = true;
     }
     else {
