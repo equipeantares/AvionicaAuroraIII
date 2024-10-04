@@ -328,7 +328,7 @@ void loop() {
   } else
     Serial.println("Erro ao abrir arquivo dataframe.txt");
   
-  if(led_aceso) {
+  if(!led_aceso) {
     if(altitude < altitude_anterior) {
       digitalWrite(26, HIGH);
       led_aceso = true;
