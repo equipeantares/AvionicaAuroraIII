@@ -6377,7 +6377,7 @@
 		(dnp no)
 		(uuid "0d998495-fe75-4167-a687-2d3a17b67a81")
 		(property "Reference" "JP7"
-			(at 250.19 132.0799 90)
+			(at 250.19 132.0799 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8503,7 +8503,7 @@
 		(dnp no)
 		(uuid "7b3d383e-e26e-4514-8dc0-0ff49215ede0")
 		(property "Reference" "JP1"
-			(at 138.43 25.3999 90)
+			(at 138.43 25.3999 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9334,7 +9334,7 @@
 		(dnp no)
 		(uuid "98fcf368-c62a-4ce9-a187-22028651b07c")
 		(property "Reference" "JP3"
-			(at 247.65 49.5299 90)
+			(at 247.65 49.5299 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9536,7 +9536,7 @@
 		(dnp no)
 		(uuid "a2fc3e6b-f8d2-4f86-90c7-594f28271b11")
 		(property "Reference" "JP5"
-			(at 255.27 97.7899 90)
+			(at 255.27 97.7899 0)
 			(effects
 				(font
 					(size 1.27 1.27)
